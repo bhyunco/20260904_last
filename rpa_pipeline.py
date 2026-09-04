@@ -62,9 +62,26 @@ if not os.path.exists(os.path.join(BASE_DIR, "DE.xlsx")):
             BASE_DIR = alt
             break
 
-FILE_RAW = os.path.join(BASE_DIR, "naver_cafe_article.xlsx")
-FILE_YN = os.path.join(BASE_DIR, "naver_cafe_article_yn.xlsx")
-FILE_DE = os.path.join(BASE_DIR, "DE.xlsx")
+import tempfile
+# Vercel 등 서버리스 환경(읽기 전용 파일시스템) 대응: 쓰기 디렉토리는 /tmp 사용
+if os.environ.get("VERCEL") or not os.access(BASE_DIR, os.W_OK):
+    WRITE_DIR = tempfile.gettempdir()
+else:
+    WRITE_DIR = BASE_DIR
+
+def get_existing_file(filename):
+    """생성된 파일 우선, 없으면 기본 번들 파일 조회"""
+    w_path = os.path.join(WRITE_DIR, filename)
+    if os.path.exists(w_path):
+        return w_path
+    b_path = os.path.join(BASE_DIR, filename)
+    if os.path.exists(b_path):
+        return b_path
+    return w_path
+
+FILE_RAW = os.path.join(WRITE_DIR, "naver_cafe_article.xlsx")
+FILE_YN = os.path.join(WRITE_DIR, "naver_cafe_article_yn.xlsx")
+FILE_DE = os.path.join(WRITE_DIR, "DE.xlsx")
 
 
 # ============================================================
@@ -358,12 +375,28 @@ def send_email(
     # 공백 제거
     clean_password = app_password.replace(" ", "") if app_password else ""
 
-    if not os.path.exists(attachment_path):
-        raise FileNotFoundError(f"첨부파일을 찾을 수 없습니다.\n파일 위치: {attachment_path}")
+    target_attachment = attachment_path
+    if not os.path.exists(target_attachment):
+        alt = get_existing_file(os.path.basename(attachment_path))
+        if os.path.exists(alt):
+            target_attachment = alt
+        else:
+            try:
+                summary = get_dashboard_summary()
+                if summary and summary.get("has_data"):
+                    df_out = pd.DataFrame(summary.get("table_data", []))
+                    df_out.to_excel(target_attachment, index=False)
+            except Exception:
+                pass
+
+    if not os.path.exists(target_attachment):
+        raise FileNotFoundError(f"첨부파일을 찾을 수 없습니다.\n파일 위치: {target_attachment}")
 
     # DE.xlsx 데이터 로드하여 비즈니스 HTML 이메일 구성
     try:
-        df_de = pd.read_excel(attachment_path, index_col=0)
+        df_de = pd.read_excel(target_attachment)
+        if "긍정" not in df_de.columns and len(df_de.columns) >= 4:
+            df_de.columns = ["기업명", "긍정", "부정", "전체"][:len(df_de.columns)]
         total_pos = int(df_de["긍정"].sum()) if "긍정" in df_de.columns else 0
         total_neg = int(df_de["부정"].sum()) if "부정" in df_de.columns else 0
         total_all = int(df_de["전체"].sum()) if "전체" in df_de.columns else (total_pos + total_neg)
@@ -395,14 +428,14 @@ def send_email(
     msg.attach(body_part)
 
     # 6. DE.xlsx 첨부 (기존 로직 100% 보존)
-    with open(attachment_path, "rb") as attachment:
+    with open(target_attachment, "rb") as attachment:
         part = MIMEBase("application", "octet-stream")
         part.set_payload(attachment.read())
 
     encoders.encode_base64(part)
     part.add_header(
         "Content-Disposition",
-        f'attachment; filename="{os.path.basename(attachment_path)}"'
+        f'attachment; filename="{os.path.basename(target_attachment)}"'
     )
     msg.attach(part)
 
@@ -487,6 +520,31 @@ def run_full_rpa_pipeline(
             except Exception as e:
                 completed_count += 1
                 report(None, f"[{comp}] 처리 중 오류: {e}")
+
+    if len(all_crawled_data) == 0:
+        report(45, "새로 크롤링된 신규 게시글이 없으므로(서버리스 또는 브라우저 제한), 기존 데이터셋을 기반으로 보고서를 생성합니다.")
+        summary_data = get_dashboard_summary()
+        report(85, f"Gmail SMTP를 통해 '{receiver}'로 비즈니스 보고서 발송 중...")
+        try:
+            send_email(
+                sender=sender,
+                receiver=receiver,
+                app_password=app_password,
+                subject="교육회사별 시장반응결과물 전송드립니다.",
+                attachment_path=FILE_DE,
+                log_callback=lambda msg: report(None, msg)
+            )
+            report(95, "이메일 발송 성공 (DE.xlsx 첨부 완료)")
+        except Exception as e:
+            report(95, f"이메일 발송 결과: {e}")
+
+        try:
+            sync_to_supabase(summary_data)
+        except Exception:
+            pass
+
+        report(100, "🎉 RPA 자동화 파이프라인 전체 완료!", summary_data)
+        return summary_data
 
     report(45, f"크롤링 수집 완료: 총 {len(all_crawled_data)}건 수집됨. 엑셀 저장 중...")
     
@@ -726,11 +784,12 @@ def get_dashboard_summary():
         "articles": []
     }
 
-    if not os.path.exists(FILE_DE):
+    target_de = get_existing_file("DE.xlsx")
+    if not os.path.exists(target_de):
         return result
 
     try:
-        df_de = pd.read_excel(FILE_DE)
+        df_de = pd.read_excel(target_de)
         
         # 첫 번째 열이 기업명 컬럼이거나 인덱스인 경우
         if len(df_de.columns) >= 4:
@@ -788,8 +847,9 @@ def get_dashboard_summary():
         result["has_data"] = True
 
         # 기사 목록
-        if os.path.exists(FILE_YN):
-            df_yn = pd.read_excel(FILE_YN)
+        target_yn = get_existing_file("naver_cafe_article_yn.xlsx")
+        if os.path.exists(target_yn):
+            df_yn = pd.read_excel(target_yn)
             if "게시글제목" not in df_yn.columns:
                 cols = list(df_yn.columns)
                 if len(cols) == 5:

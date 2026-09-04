@@ -162,6 +162,26 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     }
 
+    let lastLoggedMessage = "";
+    let pollTimer = null;
+
+    function startPollingStatus() {
+        if (pollTimer) return;
+        pollTimer = setInterval(async () => {
+            try {
+                const resp = await fetch("/api/status");
+                const d = await resp.json();
+                if (d && d.job) {
+                    updateProgressUI(d.job);
+                    if (d.job.status !== "running") {
+                        clearInterval(pollTimer);
+                        pollTimer = null;
+                    }
+                }
+            } catch (e) {}
+        }, 2000);
+    }
+
     function updateProgressUI(data) {
         if (!data) return;
 
@@ -170,7 +190,8 @@ document.addEventListener("DOMContentLoaded", () => {
         bigPercentText.innerText = percent;
         progressPercentDisplay.innerText = `${percent}%`;
 
-        if (data.message) {
+        if (data.message && data.message !== lastLoggedMessage) {
+            lastLoggedMessage = data.message;
             currentStepMessage.innerText = data.message;
             addLogLine(`[${data.timestamp || getCurTime()}] ${data.message}`, getLogClass(data.status));
         }
@@ -181,11 +202,13 @@ document.addEventListener("DOMContentLoaded", () => {
             progressPulse.classList.add("active");
             btnStartRpa.disabled = true;
             btnStartRpa.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 자동화 작업 진행 중...';
+            startPollingStatus();
         } else if (data.status === "completed") {
             setSystemStatus("완료됨", "idle");
             progressPulse.classList.remove("active");
             btnStartRpa.disabled = false;
             btnStartRpa.innerHTML = '<i class="fa-solid fa-play"></i> RPA 전체 자동화 실행';
+            if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
             showToast("🎉 RPA 전체 자동화가 성공적으로 완료되었습니다!", "success");
             loadDashboardData();
         } else if (data.status === "error") {
@@ -193,6 +216,7 @@ document.addEventListener("DOMContentLoaded", () => {
             progressPulse.classList.remove("active");
             btnStartRpa.disabled = false;
             btnStartRpa.innerHTML = '<i class="fa-solid fa-play"></i> RPA 전체 자동화 실행';
+            if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
             showToast(`작업 중 오류: ${data.message}`, "error");
         }
 
