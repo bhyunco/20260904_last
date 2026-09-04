@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="파이썬 Flask로 구축된 현대적이고 스마트한 고성능 할 일 관리(To-Do) 웹 애플리케이션입니다.">
+    <meta name="theme-color" content="#0f172a">
+    <title>TaskFlow - 스마트 할 일 관리 웹앱</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="theme-dark">
+    <!-- Ambient Background Glows -->
+    <div class="ambient-glow glow-1" aria-hidden="true"></div>
+    <div class="ambient-glow glow-2" aria-hidden="true"></div>
+    <div class="ambient-glow glow-3" aria-hidden="true"></div>
+
+    <div class="app-wrapper">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-brand">
+                <div class="brand-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="brand-title">TaskFlow</h1>
+                    <p class="brand-subtitle">스마트 파이썬 Flask 할 일 관리 시스템</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <div class="current-date-badge" id="current-date-display">
+                    <!-- Javascript will render formatted Korean date -->
+                    2026. 09. 03
+                </div>
+                <button id="btn-theme-toggle" class="icon-button" aria-label="테마 변경" title="라이트/다크 테마 토글">
+                    <span class="theme-icon">🌙</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Dashboard Analytics Overview -->
+        <section class="dashboard-section" aria-label="할 일 통계 현황">
+            <div class="stat-card" id="card-total-tasks">
+                <div class="stat-icon icon-total">📋</div>
+                <div class="stat-content">
+                    <span class="stat-label">전체 할 일</span>
+                    <span class="stat-value" id="stat-total-count">{{ initial_stats.total }}</span>
+                </div>
+            </div>
+            <div class="stat-card" id="card-pending-tasks">
+                <div class="stat-icon icon-pending">⏳</div>
+                <div class="stat-content">
+                    <span class="stat-label">진행 중</span>
+                    <span class="stat-value text-amber" id="stat-pending-count">{{ initial_stats.pending }}</span>
+                </div>
+            </div>
+            <div class="stat-card" id="card-completed-tasks">
+                <div class="stat-icon icon-completed">✨</div>
+                <div class="stat-content">
+                    <span class="stat-label">완료됨</span>
+                    <span class="stat-value text-emerald" id="stat-completed-count">{{ initial_stats.completed }}</span>
+                </div>
+            </div>
+            <div class="stat-card" id="card-rate-tasks">
+                <div class="stat-icon icon-rate">🎯</div>
+                <div class="stat-content">
+                    <span class="stat-label">달성률</span>
+                    <span class="stat-value text-indigo" id="stat-rate-count">{{ initial_stats.completion_rate }}%</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="stat-progress-bar" style="width: {{ initial_stats.completion_rate }}%;"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Quick Add Task Form -->
+        <section class="create-section" aria-label="할 일 등록">
+            <form id="todo-form" class="create-card">
+                <div class="create-header">
+                    <h2 class="create-title">새로운 할 일 등록</h2>
+                    <span class="create-hint">Enter를 누르면 바로 추가됩니다</span>
+                </div>
+                <div class="form-row main-input-row">
+                    <div class="input-with-icon">
+                        <span class="input-icon">✏️</span>
+                        <input 
+                            type="text" 
+                            id="input-task-title" 
+                            name="title" 
+                            placeholder="어떤 할 일을 계획하고 계신가요?" 
+                            required 
+                            autocomplete="off"
+                            maxlength="100"
+                        >
+                    </div>
+                    <button type="submit" id="btn-submit-task" class="btn-primary">
+                        <span class="btn-icon">+</span>
+                        <span class="btn-text">추가하기</span>
+                    </button>
+                </div>
+                
+                <!-- Expanded details (category, priority, due date, description) -->
+                <div class="form-details-grid">
+                    <div class="field-group">
+                        <label for="select-category" class="field-label">카테고리</label>
+                        <select id="select-category" name="category" class="custom-select">
+                            <option value="업무">🏢 업무</option>
+                            <option value="개인">👤 개인</option>
+                            <option value="공부">📚 공부</option>
+                            <option value="쇼핑">🛒 쇼핑</option>
+                            <option value="아이디어">💡 아이디어</option>
+                            <option value="기타">📌 기타</option>
+                        </select>
+                    </div>
+
+                    <div class="field-group">
+                        <label for="select-priority" class="field-label">우선순위</label>
+                        <select id="select-priority" name="priority" class="custom-select">
+                            <option value="높음">🔴 높음</option>
+                            <option value="보통" selected>🟡 보통</option>
+                            <option value="낮음">🟢 낮음</option>
+                        </select>
+                    </div>
+
+                    <div class="field-group">
+                        <label for="input-due-date" class="field-label">마감 기한</label>
+                        <input type="date" id="input-due-date" name="due_date" class="custom-input-date">
+                    </div>
+
+                    <div class="field-group full-width">
+                        <label for="input-task-desc" class="field-label">상세 메모 (선택)</label>
+                        <input type="text" id="input-task-desc" name="description" placeholder="세부 내용이나 메모를 입력하세요" class="custom-input-text">
+                    </div>
+                </div>
+            </form>
+        </section>
+
+        <!-- Controls: Filters, Search, Sort & Bulk Actions -->
+        <nav class="controls-nav" aria-label="필터 및 정렬 컨트롤">
+            <!-- Status Tabs -->
+            <div class="tabs-group" role="tablist" aria-label="상태 필터">
+                <button type="button" class="tab-button active" id="filter-all" data-status="all" role="tab" aria-selected="true">
+                    전체 <span class="tab-badge" id="badge-all-count">0</span>
+                </button>
+                <button type="button" class="tab-button" id="filter-active" data-status="active" role="tab" aria-selected="false">
+                    진행 중 <span class="tab-badge" id="badge-active-count">0</span>
+                </button>
+                <button type="button" class="tab-button" id="filter-completed" data-status="completed" role="tab" aria-selected="false">
+                    완료됨 <span class="tab-badge" id="badge-completed-count">0</span>
+                </button>
+            </div>
+
+            <!-- Search, Category Filter, and Sort -->
+            <div class="controls-toolbar">
+                <div class="search-box">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="input-search" placeholder="할 일 검색..." aria-label="할 일 검색">
+                    <button type="button" id="btn-clear-search" class="clear-search-btn" title="검색어 지우기" style="display:none;">✕</button>
+                </div>
+
+                <div class="filter-dropdowns">
+                    <select id="filter-category" class="filter-select" aria-label="카테고리 필터">
+                        <option value="all">모든 카테고리</option>
+                        <option value="업무">🏢 업무</option>
+                        <option value="개인">👤 개인</option>
+                        <option value="공부">📚 공부</option>
+                        <option value="쇼핑">🛒 쇼핑</option>
+                        <option value="아이디어">💡 아이디어</option>
+                        <option value="기타">📌 기타</option>
+                    </select>
+
+                    <select id="filter-sort" class="filter-select" aria-label="정렬 기준">
+                        <option value="newest">최신 등록순</option>
+                        <option value="oldest">오래된순</option>
+                        <option value="due_date">마감 기한순</option>
+                        <option value="priority">우선순위순</option>
+                    </select>
+
+                    <button type="button" id="btn-clear-completed" class="btn-outline-danger" title="완료된 할 일 일괄 정리">
+                        🗑️ 완료 삭제
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Todo List Container -->
+        <main class="todo-list-container" aria-label="할 일 목록">
+            <div id="todo-items-list" class="todo-items-list" role="list">
+                <!-- Todo item cards will be dynamically rendered via Javascript -->
+            </div>
+
+            <!-- Empty State -->
+            <div id="empty-state" class="empty-state" style="display: none;">
+                <div class="empty-state-icon">🎉</div>
+                <h3 class="empty-state-title">할 일이 없습니다!</h3>
+                <p class="empty-state-desc">새로운 계획을 등록하거나 다른 필터를 선택해 보세요.</p>
+            </div>
+
+            <!-- Loading Spinner -->
+            <div id="loading-spinner" class="loading-spinner" style="display: none;">
+                <div class="spinner-ring"></div>
+                <span>목록을 불러오는 중...</span>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>TaskFlow Python Flask Application &bull; SQLite Persistence &bull; Crafted with Modern Vibe</p>
+        </footer>
+    </div>
+
+    <!-- Edit Task Modal -->
+    <div id="edit-modal" class="modal-overlay" aria-hidden="true" role="dialog" aria-labelledby="modal-title">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2 id="modal-title" class="modal-title">할 일 수정하기</h2>
+                <button type="button" id="btn-close-modal" class="btn-modal-close" aria-label="닫기">✕</button>
+            </div>
+            <form id="edit-form" class="modal-body">
+                <input type="hidden" id="edit-task-id">
+                
+                <div class="form-group">
+                    <label for="edit-title" class="field-label">할 일 제목</label>
+                    <input type="text" id="edit-title" required class="modal-input" maxlength="100">
+                </div>
+
+                <div class="modal-grid-2">
+                    <div class="form-group">
+                        <label for="edit-category" class="field-label">카테고리</label>
+                        <select id="edit-category" class="modal-select">
+                            <option value="업무">🏢 업무</option>
+                            <option value="개인">👤 개인</option>
+                            <option value="공부">📚 공부</option>
+                            <option value="쇼핑">🛒 쇼핑</option>
+                            <option value="아이디어">💡 아이디어</option>
+                            <option value="기타">📌 기타</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="edit-priority" class="field-label">우선순위</label>
+                        <select id="edit-priority" class="modal-select">
+                            <option value="높음">🔴 높음</option>
+                            <option value="보통">🟡 보통</option>
+                            <option value="낮음">🟢 낮음</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="edit-due-date" class="field-label">마감 기한</label>
+                    <input type="date" id="edit-due-date" class="modal-input">
+                </div>
+
+                <div class="form-group">
+                    <label for="edit-description" class="field-label">상세 메모</label>
+                    <textarea id="edit-description" rows="3" class="modal-textarea" placeholder="메모를 입력하세요..."></textarea>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" id="btn-cancel-edit" class="btn-secondary">취소</button>
+                    <button type="submit" id="btn-save-edit" class="btn-primary">저장 완료</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification Hub -->
+    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Application Script -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
