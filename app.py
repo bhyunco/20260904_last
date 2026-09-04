@@ -71,6 +71,11 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/favicon.ico")
+def favicon():
+    return "", 204
+
+
 @app.route("/api/status", methods=["GET"])
 def get_status():
     summary = rpa_pipeline.get_dashboard_summary()
