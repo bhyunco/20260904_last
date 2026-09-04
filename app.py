@@ -3,6 +3,7 @@ import json
 import time
 import queue
 import threading
+import pandas as pd
 from flask import Flask, render_template, request, jsonify, Response, send_from_directory
 
 import rpa_pipeline
@@ -183,6 +184,16 @@ def trigger_send_email():
     subject = data.get("subject") or "교육회사별 시장반응결과물 전송드립니다."
 
     if not os.path.exists(rpa_pipeline.FILE_DE):
+        # 서버리스 환경 또는 파일 미존재 시 Supabase 데이터로부터 자동 복원
+        summary = rpa_pipeline.get_dashboard_summary()
+        if summary and summary.get("has_data") and summary.get("table_data"):
+            try:
+                df_out = pd.DataFrame(summary.get("table_data", []))
+                df_out.to_excel(rpa_pipeline.FILE_DE, index=False, engine="openpyxl")
+            except Exception as e:
+                print(f"DE.xlsx 자동 복원 오류: {e}")
+
+    if not os.path.exists(rpa_pipeline.FILE_DE):
         return jsonify({"error": "전송할 DE.xlsx 파일이 존재하지 않습니다. 먼저 RPA를 실행해주세요."}), 400
 
     logs = []
@@ -234,10 +245,9 @@ def download_file(filename):
                 buf = io.BytesIO()
                 if filename == "DE.xlsx":
                     df_out = pd.DataFrame(summary.get("table_data", []))
-                    df_out.to_excel(buf, index=False)
                 else:
                     df_out = pd.DataFrame(summary.get("articles", []))
-                    df_out.to_excel(buf, index=False)
+                df_out.to_excel(buf, index=False, engine="openpyxl")
                 buf.seek(0)
                 return send_file(
                     buf,
