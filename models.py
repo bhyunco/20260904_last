@@ -1,8 +1,13 @@
 import sqlite3
 import os
+import tempfile
 from datetime import datetime
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'todo.db')
+# Vercel serverless environment has a read-only filesystem except /tmp
+if os.environ.get('VERCEL'):
+    DB_PATH = os.path.join(tempfile.gettempdir(), 'todo.db')
+else:
+    DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'todo.db')
 
 def get_db_connection():
     """Create a database connection with dict-like row access."""
