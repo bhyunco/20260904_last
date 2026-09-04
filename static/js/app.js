@@ -1,546 +1,637 @@
-/**
- * TaskFlow Application JavaScript
- * Vanilla JS implementation for state management, REST API interaction, and UI rendering.
- */
+// ============================================================
+// VIBE RPA Front-end Application Controller
+// ============================================================
 
-document.addEventListener('DOMContentLoaded', () => {
-    // Current App State
-    const state = {
-        todos: [],
-        currentStatus: 'all',
-        currentCategory: 'all',
-        currentSort: 'newest',
-        searchQuery: '',
-        theme: localStorage.getItem('taskflow_theme') || 'dark'
-    };
+document.addEventListener("DOMContentLoaded", () => {
+    // --------------------------------------------------------
+    // 1. DOM Elements
+    // --------------------------------------------------------
+    const btnStartRpa = document.getElementById("btnStartRpa");
+    const btnSendEmailOnly = document.getElementById("btnSendEmailOnly");
+    const btnRefreshData = document.getElementById("btnRefreshData");
+    const btnClearLogs = document.getElementById("btnClearLogs");
 
-    // DOM Elements
-    const elements = {
-        // Theme & Header
-        body: document.body,
-        themeToggleBtn: document.getElementById('btn-theme-toggle'),
-        themeIcon: document.querySelector('.theme-icon'),
-        currentDateDisplay: document.getElementById('current-date-display'),
+    const appPasswordInput = document.getElementById("appPasswordInput");
+    const rememberPasswordCheck = document.getElementById("rememberPasswordCheck");
+    const togglePasswordVisibility = document.getElementById("togglePasswordVisibility");
+    const eyeIcon = document.getElementById("eyeIcon");
 
-        // Stats elements
-        statTotal: document.getElementById('stat-total-count'),
-        statPending: document.getElementById('stat-pending-count'),
-        statCompleted: document.getElementById('stat-completed-count'),
-        statRate: document.getElementById('stat-rate-count'),
-        statProgressBar: document.getElementById('stat-progress-bar'),
+    const senderEmail = document.getElementById("senderEmail");
+    const receiverEmail = document.getElementById("receiverEmail");
+    const headlessCheck = document.getElementById("headlessCheck");
 
-        // Badges on tabs
-        badgeAll: document.getElementById('badge-all-count'),
-        badgeActive: document.getElementById('badge-active-count'),
-        badgeCompleted: document.getElementById('badge-completed-count'),
+    const companyTagsContainer = document.getElementById("companyTagsContainer");
+    const newCompanyInput = document.getElementById("newCompanyInput");
+    const btnAddCompany = document.getElementById("btnAddCompany");
 
-        // Create Task Form
-        todoForm: document.getElementById('todo-form'),
-        inputTitle: document.getElementById('input-task-title'),
-        selectCategory: document.getElementById('select-category'),
-        selectPriority: document.getElementById('select-priority'),
-        inputDueDate: document.getElementById('input-due-date'),
-        inputDesc: document.getElementById('input-task-desc'),
+    const progressBarFill = document.getElementById("progressBarFill");
+    const bigPercentText = document.getElementById("bigPercentText");
+    const progressPercentDisplay = document.getElementById("progressPercentDisplay");
+    const currentStepMessage = document.getElementById("currentStepMessage");
+    const progressPulse = document.getElementById("progressPulse");
+    const terminalLogs = document.getElementById("terminalLogs");
 
-        // Controls
-        statusTabs: document.querySelectorAll('.tab-button'),
-        inputSearch: document.getElementById('input-search'),
-        btnClearSearch: document.getElementById('btn-clear-search'),
-        filterCategory: document.getElementById('filter-category'),
-        filterSort: document.getElementById('filter-sort'),
-        btnClearCompleted: document.getElementById('btn-clear-completed'),
+    const systemStatusPill = document.getElementById("systemStatusPill");
+    const systemStatusText = document.getElementById("systemStatusText");
 
-        // List & State
-        todoItemsList: document.getElementById('todo-items-list'),
-        emptyState: document.getElementById('empty-state'),
-        loadingSpinner: document.getElementById('loading-spinner'),
+    const kpiTotalArticles = document.getElementById("kpiTotalArticles");
+    const kpiPositive = document.getElementById("kpiPositive");
+    const kpiNegative = document.getElementById("kpiNegative");
+    const kpiPosRatio = document.getElementById("kpiPosRatio");
 
-        // Edit Modal
-        editModal: document.getElementById('edit-modal'),
-        editForm: document.getElementById('edit-form'),
-        editTaskId: document.getElementById('edit-task-id'),
-        editTitle: document.getElementById('edit-title'),
-        editCategory: document.getElementById('edit-category'),
-        editPriority: document.getElementById('edit-priority'),
-        editDueDate: document.getElementById('edit-due-date'),
-        editDesc: document.getElementById('edit-description'),
-        btnCloseModal: document.getElementById('btn-close-modal'),
-        btnCancelEdit: document.getElementById('btn-cancel-edit'),
+    const summaryTableBody = document.getElementById("summaryTableBody");
+    const articlesTableBody = document.getElementById("articlesTableBody");
+    const articleFilterInput = document.getElementById("articleFilterInput");
+    const companyDonutsContainer = document.getElementById("companyDonutsContainer");
 
-        // Toast Container
-        toastContainer: document.getElementById('toast-container')
-    };
+    // --------------------------------------------------------
+    // 2. Chart Instances Storage
+    // --------------------------------------------------------
+    let overallChartInstance = null;
+    let companyBarChartInstance = null;
+    const companyDonutInstances = {};
+    let cachedArticles = [];
 
-    // ================= Initialization =================
-    initTheme();
-    initDateDisplay();
-    bindEvents();
-    loadTodos();
-    loadStats();
+    // --------------------------------------------------------
+    // 3. 앱 비밀번호 로컬스토리지 기억 기능 (요구사항 1)
+    // --------------------------------------------------------
+    const STORAGE_KEY = "vibe_rpa_app_password";
+    const savedPassword = localStorage.getItem(STORAGE_KEY);
 
-    // ================= Theme & Date =================
-    function initTheme() {
-        if (state.theme === 'light') {
-            elements.body.classList.remove('theme-dark');
-            elements.body.classList.add('theme-light');
-            elements.themeIcon.textContent = '☀️';
+    if (savedPassword) {
+        appPasswordInput.value = savedPassword;
+        rememberPasswordCheck.checked = true;
+    }
+
+    rememberPasswordCheck.addEventListener("change", () => {
+        if (rememberPasswordCheck.checked) {
+            localStorage.setItem(STORAGE_KEY, appPasswordInput.value);
+            showToast("앱 비밀번호가 브라우저에 저장되었습니다.", "success");
         } else {
-            elements.body.classList.remove('theme-light');
-            elements.body.classList.add('theme-dark');
-            elements.themeIcon.textContent = '🌙';
+            localStorage.removeItem(STORAGE_KEY);
+            showToast("저장된 앱 비밀번호가 삭제되었습니다.", "info");
         }
+    });
+
+    appPasswordInput.addEventListener("input", () => {
+        if (rememberPasswordCheck.checked) {
+            localStorage.setItem(STORAGE_KEY, appPasswordInput.value);
+        }
+    });
+
+    // 비밀번호 가시성 토글
+    togglePasswordVisibility.addEventListener("click", () => {
+        if (appPasswordInput.type === "password") {
+            appPasswordInput.type = "text";
+            eyeIcon.classList.replace("fa-eye", "fa-eye-slash");
+            togglePasswordVisibility.innerHTML = '<i class="fa-solid fa-eye-slash"></i> 숨김';
+        } else {
+            appPasswordInput.type = "password";
+            eyeIcon.classList.replace("fa-eye-slash", "fa-eye");
+            togglePasswordVisibility.innerHTML = '<i class="fa-solid fa-eye"></i> 보기';
+        }
+    });
+
+    // --------------------------------------------------------
+    // 4. 기업 태그 관리
+    // --------------------------------------------------------
+    function getCompaniesList() {
+        const tags = companyTagsContainer.querySelectorAll(".tag");
+        const list = [];
+        tags.forEach(t => {
+            const txt = t.childNodes[0].textContent.trim();
+            if (txt) list.push(txt);
+        });
+        return list;
     }
 
-    function toggleTheme() {
-        const isLight = elements.body.classList.toggle('theme-light');
-        elements.body.classList.toggle('theme-dark', !isLight);
-        state.theme = isLight ? 'light' : 'dark';
-        elements.themeIcon.textContent = isLight ? '☀️' : '🌙';
-        localStorage.setItem('taskflow_theme', state.theme);
-        showToast(`테마가 ${isLight ? '라이트' : '다크'} 모드로 변경되었습니다.`, 'info');
+    function addCompanyTag(name) {
+        const trimmed = name.trim();
+        if (!trimmed) return;
+        const currentList = getCompaniesList();
+        if (currentList.includes(trimmed)) {
+            showToast("이미 등록된 기업명입니다.", "warn");
+            return;
+        }
+        const tag = document.createElement("span");
+        tag.className = "tag";
+        tag.innerHTML = `${trimmed} <i class="fa-solid fa-xmark remove-tag"></i>`;
+        companyTagsContainer.appendChild(tag);
+        newCompanyInput.value = "";
     }
 
-    function initDateDisplay() {
-        const now = new Date();
-        const days = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const date = String(now.getDate()).padStart(2, '0');
-        const dayName = days[now.getDay()];
-        
-        if (elements.currentDateDisplay) {
-            elements.currentDateDisplay.textContent = `📅 ${year}.${month}.${date} (${dayName})`;
+    btnAddCompany.addEventListener("click", () => addCompanyTag(newCompanyInput.value));
+    newCompanyInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            addCompanyTag(newCompanyInput.value);
         }
+    });
 
-        // Set default due date input to today
-        if (elements.inputDueDate) {
-            elements.inputDueDate.min = `${year}-${month}-${date}`;
-        }
-    }
-
-    // ================= Toast Notifications =================
-    function showToast(message, type = 'info') {
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        
-        let icon = 'ℹ️';
-        if (type === 'success') icon = '✅';
-        if (type === 'error') icon = '⚠️';
-
-        toast.innerHTML = `<span>${icon}</span><span>${escapeHtml(message)}</span>`;
-        elements.toastContainer.appendChild(toast);
-
-        setTimeout(() => {
-            if (toast.parentNode) {
-                toast.parentNode.removeChild(toast);
+    companyTagsContainer.addEventListener("click", (e) => {
+        if (e.target.classList.contains("remove-tag")) {
+            const tag = e.target.closest(".tag");
+            if (companyTagsContainer.querySelectorAll(".tag").length <= 1) {
+                showToast("최소 1개 이상의 기업이 필요합니다.", "warn");
+                return;
             }
-        }, 3600);
+            tag.remove();
+        }
+    });
+
+    // --------------------------------------------------------
+    // 5. SSE 실시간 스트림 연결 (요구사항 2: 실시간 % 진행상황)
+    // --------------------------------------------------------
+    let eventSource = null;
+
+    function initEventSource() {
+        if (eventSource) eventSource.close();
+        eventSource = new EventSource("/api/stream");
+
+        eventSource.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                updateProgressUI(data);
+            } catch (err) {
+                // Keepalive heartbeat
+            }
+        };
+
+        eventSource.onerror = () => {
+            // Reconnect automatically
+        };
     }
 
-    // ================= API Operations =================
-    async function loadTodos() {
-        showLoading(true);
-        try {
-            const params = new URLSearchParams({
-                status: state.currentStatus,
-                category: state.currentCategory,
-                sort: state.currentSort,
-                search: state.searchQuery
-            });
+    function updateProgressUI(data) {
+        if (!data) return;
 
-            const res = await fetch(`/api/todos?${params.toString()}`);
-            const data = await res.json();
-            
-            if (data.success) {
-                state.todos = data.todos;
-                renderTodos();
+        const percent = Math.min(100, Math.max(0, data.percent || 0));
+        progressBarFill.style.width = `${percent}%`;
+        bigPercentText.innerText = percent;
+        progressPercentDisplay.innerText = `${percent}%`;
+
+        if (data.message) {
+            currentStepMessage.innerText = data.message;
+            addLogLine(`[${data.timestamp || getCurTime()}] ${data.message}`, getLogClass(data.status));
+        }
+
+        // 상태 인디케이터 뱃지 및 스텝
+        if (data.status === "running") {
+            setSystemStatus("실행 중", "running");
+            progressPulse.classList.add("active");
+            btnStartRpa.disabled = true;
+            btnStartRpa.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 자동화 작업 진행 중...';
+        } else if (data.status === "completed") {
+            setSystemStatus("완료됨", "idle");
+            progressPulse.classList.remove("active");
+            btnStartRpa.disabled = false;
+            btnStartRpa.innerHTML = '<i class="fa-solid fa-play"></i> RPA 전체 자동화 실행';
+            showToast("🎉 RPA 전체 자동화가 성공적으로 완료되었습니다!", "success");
+            loadDashboardData();
+        } else if (data.status === "error") {
+            setSystemStatus("오류 발생", "error");
+            progressPulse.classList.remove("active");
+            btnStartRpa.disabled = false;
+            btnStartRpa.innerHTML = '<i class="fa-solid fa-play"></i> RPA 전체 자동화 실행';
+            showToast(`작업 중 오류: ${data.message}`, "error");
+        }
+
+        updateStepTracker(percent);
+    }
+
+    function updateStepTracker(pct) {
+        const steps = [
+            { id: "step1", line: "line1", threshold: 5, compThreshold: 48 },
+            { id: "step2", line: "line2", threshold: 48, compThreshold: 76 },
+            { id: "step3", line: "line3", threshold: 76, compThreshold: 86 },
+            { id: "step4", line: null, threshold: 86, compThreshold: 98 }
+        ];
+
+        steps.forEach((s) => {
+            const stepEl = document.getElementById(s.id);
+            const lineEl = s.line ? document.getElementById(s.line) : null;
+
+            if (pct >= s.compThreshold) {
+                stepEl.className = "step-item completed";
+                if (lineEl) lineEl.className = "step-line completed";
+            } else if (pct >= s.threshold) {
+                stepEl.className = "step-item active";
+                if (lineEl) lineEl.className = "step-line";
             } else {
-                showToast(data.error || '목록 로드 실패', 'error');
+                stepEl.className = "step-item";
+                if (lineEl) lineEl.className = "step-line";
             }
-        } catch (err) {
-            console.error('Failed to fetch todos:', err);
-            showToast('서버 연결 중 오류가 발생했습니다.', 'error');
-        } finally {
-            showLoading(false);
-        }
+        });
     }
 
-    async function loadStats() {
-        try {
-            const res = await fetch('/api/stats');
-            const data = await res.json();
-            if (data.success) {
-                updateStatsUI(data.stats);
-            }
-        } catch (err) {
-            console.error('Failed to fetch stats:', err);
-        }
+    function setSystemStatus(text, type) {
+        systemStatusText.innerText = text;
+        const dot = systemStatusPill.querySelector(".status-dot");
+        dot.className = "status-dot";
+        if (type === "running") dot.classList.add("running");
+        else if (type === "error") dot.classList.add("error");
     }
 
-    function updateStatsUI(stats) {
-        if (!stats) return;
-        elements.statTotal.textContent = stats.total;
-        elements.statPending.textContent = stats.pending;
-        elements.statCompleted.textContent = stats.completed;
-        elements.statRate.textContent = `${stats.completion_rate}%`;
-        elements.statProgressBar.style.width = `${stats.completion_rate}%`;
-
-        // Update tab badges
-        elements.badgeAll.textContent = stats.total;
-        elements.badgeActive.textContent = stats.pending;
-        elements.badgeCompleted.textContent = stats.completed;
+    function addLogLine(msg, typeClass = "info") {
+        const line = document.createElement("div");
+        line.className = `log-line ${typeClass}`;
+        line.textContent = msg;
+        terminalLogs.appendChild(line);
+        terminalLogs.scrollTop = terminalLogs.scrollHeight;
     }
 
-    async function handleAddTodo(e) {
-        e.preventDefault();
-        const title = elements.inputTitle.value.trim();
-        if (!title) {
-            showToast('할 일 제목을 입력해주세요.', 'error');
+    function getLogClass(status) {
+        if (status === "error") return "error";
+        if (status === "completed") return "success";
+        return "info";
+    }
+
+    function getCurTime() {
+        const now = new Date();
+        return now.toTimeString().split(" ")[0];
+    }
+
+    btnClearLogs.addEventListener("click", () => {
+        terminalLogs.innerHTML = "";
+    });
+
+    // --------------------------------------------------------
+    // 6. RPA 전체 파이프라인 실행 트리거
+    // --------------------------------------------------------
+    btnStartRpa.addEventListener("click", async () => {
+        const companies = getCompaniesList();
+        const sender = senderEmail.value.trim();
+        const receiver = receiverEmail.value.trim();
+        const appPassword = appPasswordInput.value.trim();
+        const headless = headlessCheck.checked;
+
+        if (!companies.length) {
+            showToast("분석할 기업명을 하나 이상 입력하세요.", "warn");
             return;
         }
 
-        const payload = {
-            title: title,
-            category: elements.selectCategory.value,
-            priority: elements.selectPriority.value,
-            due_date: elements.inputDueDate.value,
-            description: elements.inputDesc.value.trim()
-        };
+        if (rememberPasswordCheck.checked) {
+            localStorage.setItem(STORAGE_KEY, appPassword);
+        }
 
         try {
-            const res = await fetch('/api/todos', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+            btnStartRpa.disabled = true;
+            btnStartRpa.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 작업 요청 중...';
+
+            const resp = await fetch("/api/run", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    companies,
+                    sender,
+                    receiver,
+                    app_password: appPassword,
+                    headless
+                })
             });
-            const data = await res.json();
-            
-            if (data.success) {
-                showToast('새로운 할 일이 추가되었습니다!', 'success');
-                elements.inputTitle.value = '';
-                elements.inputDesc.value = '';
-                elements.inputDueDate.value = '';
-                elements.inputTitle.focus();
-                
-                updateStatsUI(data.stats);
-                loadTodos();
+
+            const res = await resp.json();
+            if (resp.ok) {
+                showToast("RPA 자동화 파이프라인이 시작되었습니다.", "info");
+                terminalLogs.innerHTML = "";
+                addLogLine(`[${getCurTime()}] RPA 파이프라인 기동 요청 완료`, "info");
             } else {
-                showToast(data.error || '등록 실패', 'error');
+                showToast(res.error || "실행 요청 실패", "error");
+                btnStartRpa.disabled = false;
+                btnStartRpa.innerHTML = '<i class="fa-solid fa-play"></i> RPA 전체 자동화 실행';
             }
         } catch (err) {
-            console.error('Add todo error:', err);
-            showToast('할 일 등록 중 문제가 발생했습니다.', 'error');
+            showToast(`요청 실패: ${err.message}`, "error");
+            btnStartRpa.disabled = false;
+            btnStartRpa.innerHTML = '<i class="fa-solid fa-play"></i> RPA 전체 자동화 실행';
+        }
+    });
+
+    // --------------------------------------------------------
+    // 7. 이메일만 재발송 트리거 (요구사항 3: 비즈니스 메일)
+    // --------------------------------------------------------
+    btnSendEmailOnly.addEventListener("click", async () => {
+        const sender = senderEmail.value.trim();
+        const receiver = receiverEmail.value.trim();
+        const appPassword = appPasswordInput.value.trim();
+
+        if (!appPassword) {
+            showToast("Gmail 앱 비밀번호를 입력해주세요.", "warn");
+            return;
+        }
+
+        btnSendEmailOnly.disabled = true;
+        btnSendEmailOnly.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 메일 발송 중...';
+
+        try {
+            const resp = await fetch("/api/send-email", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    sender,
+                    receiver,
+                    app_password: appPassword
+                })
+            });
+
+            const res = await resp.json();
+            if (resp.ok) {
+                showToast(res.message, "success");
+                addLogLine(`[${getCurTime()}] 비즈니스 이메일 발송 완료 -> 수신자: ${receiver}`, "success");
+            } else {
+                showToast(res.error || "메일 전송 실패", "error");
+                addLogLine(`[${getCurTime()}] 메일 발송 오류: ${res.error}`, "error");
+            }
+        } catch (err) {
+            showToast(`발송 요청 중 네트워크 오류: ${err.message}`, "error");
+        } finally {
+            btnSendEmailOnly.disabled = false;
+            btnSendEmailOnly.innerHTML = '<i class="fa-solid fa-envelope"></i> 결과 이메일만 재발송';
+        }
+    });
+
+    // --------------------------------------------------------
+    // 8. 대시보드 데이터 로드 & 차트 렌더링 (요구사항 5: 원형그래프 대시보드)
+    // --------------------------------------------------------
+    async function loadDashboardData() {
+        try {
+            const resp = await fetch("/api/status");
+            const data = await resp.json();
+
+            if (!data.summary || !data.summary.has_data) {
+                summaryTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">저장된 집계 데이터가 없습니다. 먼저 RPA를 실행하세요.</td></tr>';
+                companyDonutsContainer.innerHTML = '<div class="loading-placeholder">RPA 실행 후 원형 그래프가 생성됩니다.</div>';
+                return;
+            }
+
+            const s = data.summary;
+
+            // KPI 업데이트
+            kpiTotalArticles.innerText = s.overall.total.toLocaleString();
+            kpiPositive.innerText = s.overall.positive.toLocaleString();
+            kpiNegative.innerText = s.overall.negative.toLocaleString();
+            kpiPosRatio.innerText = `${s.overall.pos_ratio}%`;
+
+            // 1) 전체 반응 도넛 차트
+            renderOverallDonutChart(s.overall.positive, s.overall.negative);
+
+            // 2) 기업별 비교 바 차트
+            renderCompanyBarChart(s.table_data);
+
+            // 3) 기업별 개별 원형/도넛 차트 그리드
+            renderCompanyDonutCharts(s.by_company);
+
+            // 4) 집계 데이터 테이블
+            renderSummaryTable(s.table_data);
+
+            // 5) 기사 미리보기 테이블
+            cachedArticles = s.articles || [];
+            renderArticlesTable(cachedArticles);
+
+        } catch (err) {
+            console.error("대시보드 데이터 로드 오류:", err);
         }
     }
 
-    async function handleToggleTodo(id) {
-        try {
-            const res = await fetch(`/api/todos/${id}/toggle`, { method: 'PATCH' });
-            const data = await res.json();
-            
-            if (data.success) {
-                const todo = data.todo;
-                showToast(todo.completed ? '🎉 할 일을 완료했습니다!' : '할 일을 다시 진행 중으로 변경했습니다.', 'success');
-                updateStatsUI(data.stats);
-                
-                // If currently filtered on active or completed, reload, else update in-place
-                if (state.currentStatus !== 'all') {
-                    loadTodos();
-                } else {
-                    const itemIdx = state.todos.findIndex(t => t.id === id);
-                    if (itemIdx !== -1) {
-                        state.todos[itemIdx] = todo;
-                        renderTodos();
+    btnRefreshData.addEventListener("click", () => {
+        loadDashboardData();
+        showToast("대시보드 데이터를 갱신했습니다.", "info");
+    });
+
+    // Chart 1: 전체 시장 반응 도넛 차트
+    function renderOverallDonutChart(pos, neg) {
+        const ctx = document.getElementById("overallDonutChart").getContext("2d");
+        if (overallChartInstance) overallChartInstance.destroy();
+
+        overallChartInstance = new Chart(ctx, {
+            type: "doughnut",
+            data: {
+                labels: ["긍정 반응", "부정 반응"],
+                datasets: [{
+                    data: [pos, neg],
+                    backgroundColor: ["#10b981", "#f43f5e"],
+                    borderColor: ["#0b0f19", "#0b0f19"],
+                    borderWidth: 4,
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: "bottom",
+                        labels: { color: "#e2e8f0", font: { size: 12, family: "Pretendard" }, padding: 16 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                const total = pos + neg;
+                                const val = context.raw;
+                                const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+                                return ` ${context.label}: ${val}건 (${pct}%)`;
+                            }
+                        }
+                    }
+                },
+                cutout: "68%"
+            }
+        });
+    }
+
+    // Chart 2: 기업별 비교 바 차트
+    function renderCompanyBarChart(tableData) {
+        const ctx = document.getElementById("companyBarChart").getContext("2d");
+        if (companyBarChartInstance) companyBarChartInstance.destroy();
+
+        const labels = tableData.map(d => d.company);
+        const posData = tableData.map(d => d.positive);
+        const negData = tableData.map(d => d.negative);
+
+        companyBarChartInstance = new Chart(ctx, {
+            type: "bar",
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: "긍정(+)",
+                        data: posData,
+                        backgroundColor: "#10b981",
+                        borderRadius: 6
+                    },
+                    {
+                        label: "부정(-)",
+                        data: negData,
+                        backgroundColor: "#f43f5e",
+                        borderRadius: 6
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: "bottom",
+                        labels: { color: "#e2e8f0", font: { size: 12, family: "Pretendard" } }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: "#94a3b8", font: { family: "Pretendard" } },
+                        grid: { display: false }
+                    },
+                    y: {
+                        ticks: { color: "#94a3b8", stepSize: 5 },
+                        grid: { color: "#1e293b" }
                     }
                 }
-            } else {
-                showToast(data.error || '상태 변경 실패', 'error');
             }
-        } catch (err) {
-            console.error('Toggle error:', err);
-            showToast('상태 변경 실패', 'error');
-        }
+        });
     }
 
-    async function handleDeleteTodo(id) {
-        if (!confirm('정말 이 할 일을 삭제하시겠습니까?')) return;
+    // Chart 3: 각 기업별 개별 도넛/원형 그래프 그리드 렌더링
+    function renderCompanyDonutCharts(byCompany) {
+        companyDonutsContainer.innerHTML = "";
+        const companies = Object.keys(byCompany);
 
-        try {
-            const res = await fetch(`/api/todos/${id}`, { method: 'DELETE' });
-            const data = await res.json();
-            
-            if (data.success) {
-                showToast('할 일이 삭제되었습니다.', 'info');
-                updateStatsUI(data.stats);
-                loadTodos();
-            } else {
-                showToast(data.error || '삭제 실패', 'error');
-            }
-        } catch (err) {
-            console.error('Delete error:', err);
-            showToast('삭제 중 오류가 발생했습니다.', 'error');
-        }
-    }
-
-    async function handleClearCompleted() {
-        if (!confirm('완료된 모든 할 일을 정리하시겠습니까?')) return;
-
-        try {
-            const res = await fetch('/api/todos/completed', { method: 'DELETE' });
-            const data = await res.json();
-            
-            if (data.success) {
-                showToast(data.message, 'success');
-                updateStatsUI(data.stats);
-                loadTodos();
-            } else {
-                showToast(data.error || '삭제 실패', 'error');
-            }
-        } catch (err) {
-            console.error('Clear completed error:', err);
-            showToast('정리 중 오류 발생', 'error');
-        }
-    }
-
-    // ================= Edit Modal =================
-    function openEditModal(todo) {
-        elements.editTaskId.value = todo.id;
-        elements.editTitle.value = todo.title;
-        elements.editCategory.value = todo.category || '업무';
-        elements.editPriority.value = todo.priority || '보통';
-        elements.editDueDate.value = todo.due_date || '';
-        elements.editDesc.value = todo.description || '';
-
-        elements.editModal.classList.add('active');
-        elements.editModal.setAttribute('aria-hidden', 'false');
-        elements.editTitle.focus();
-    }
-
-    function closeEditModal() {
-        elements.editModal.classList.remove('active');
-        elements.editModal.setAttribute('aria-hidden', 'true');
-    }
-
-    async function handleSaveEdit(e) {
-        e.preventDefault();
-        const id = elements.editTaskId.value;
-        const title = elements.editTitle.value.trim();
-        if (!title) {
-            showToast('제목을 입력해주세요.', 'error');
+        if (!companies.length) {
+            companyDonutsContainer.innerHTML = '<div class="loading-placeholder">표시할 기업별 데이터가 없습니다.</div>';
             return;
         }
 
-        const payload = {
-            title: title,
-            category: elements.editCategory.value,
-            priority: elements.editPriority.value,
-            due_date: elements.editDueDate.value,
-            description: elements.editDesc.value.trim()
-        };
+        companies.forEach((comp, idx) => {
+            const data = byCompany[comp];
+            const canvasId = `companyDonut_${idx}`;
 
-        try {
-            const res = await fetch(`/api/todos/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-
-            if (data.success) {
-                showToast('할 일이 성공적으로 수정되었습니다.', 'success');
-                closeEditModal();
-                updateStatsUI(data.stats);
-                loadTodos();
-            } else {
-                showToast(data.error || '수정 실패', 'error');
-            }
-        } catch (err) {
-            console.error('Save edit error:', err);
-            showToast('수정 중 오류 발생', 'error');
-        }
-    }
-
-    // ================= Rendering =================
-    function renderTodos() {
-        elements.todoItemsList.innerHTML = '';
-
-        if (!state.todos || state.todos.length === 0) {
-            elements.emptyState.style.display = 'flex';
-            return;
-        }
-
-        elements.emptyState.style.display = 'none';
-
-        const todayStr = new Date().toISOString().split('T')[0];
-
-        state.todos.forEach(todo => {
-            const card = document.createElement('div');
-            
-            // Priority class
-            let priorityClass = 'priority-med';
-            let priorityBadgeClass = 'badge-priority-med';
-            if (todo.priority === '높음') {
-                priorityClass = 'priority-high';
-                priorityBadgeClass = 'badge-priority-high';
-            } else if (todo.priority === '낮음') {
-                priorityClass = 'priority-low';
-                priorityBadgeClass = 'badge-priority-low';
-            }
-
-            card.className = `todo-card ${priorityClass} ${todo.completed ? 'completed' : ''}`;
-            card.id = `todo-item-${todo.id}`;
-            card.setAttribute('role', 'listitem');
-
-            // Overdue check
-            const isOverdue = !todo.completed && todo.due_date && todo.due_date < todayStr;
-            const dueBadgeHtml = todo.due_date ? `
-                <span class="badge badge-due-date ${isOverdue ? 'is-overdue' : ''}">
-                    📅 ${escapeHtml(todo.due_date)} ${isOverdue ? '⚠️ 기한초과' : ''}
-                </span>
-            ` : '';
-
-            // Category emoji map
-            const categoryEmojiMap = {
-                '업무': '🏢',
-                '개인': '👤',
-                '공부': '📚',
-                '쇼핑': '🛒',
-                '아이디어': '💡',
-                '기타': '📌'
-            };
-            const catEmoji = categoryEmojiMap[todo.category] || '📌';
-
-            card.innerHTML = `
-                <div class="todo-checkbox-wrapper">
-                    <input 
-                        type="checkbox" 
-                        id="checkbox-todo-${todo.id}" 
-                        class="todo-checkbox" 
-                        ${todo.completed ? 'checked' : ''} 
-                        aria-label="${escapeHtml(todo.title)} 완료 토글"
-                    >
-                </div>
-                <div class="todo-content-area">
-                    <div class="todo-header-row">
-                        <span class="todo-title">${escapeHtml(todo.title)}</span>
-                    </div>
-                    ${todo.description ? `<p class="todo-description">${escapeHtml(todo.description)}</p>` : ''}
-                    <div class="todo-meta-row">
-                        <span class="badge badge-category">${catEmoji} ${escapeHtml(todo.category)}</span>
-                        <span class="badge ${priorityBadgeClass}">${escapeHtml(todo.priority)}</span>
-                        ${dueBadgeHtml}
-                    </div>
-                </div>
-                <div class="todo-actions">
-                    <button type="button" class="btn-action btn-edit" title="수정" aria-label="할 일 수정">
-                        ✏️
-                    </button>
-                    <button type="button" class="btn-action btn-delete" title="삭제" aria-label="할 일 삭제">
-                        🗑️
-                    </button>
+            const box = document.createElement("div");
+            box.className = "company-chart-box";
+            box.innerHTML = `
+                <div class="company-chart-title">${comp}</div>
+                <div class="company-chart-meta">전체 ${data.total}건 · 긍정률 <strong style="color:${data.pos_ratio >= 50 ? '#34d399' : '#fb7185'}">${data.pos_ratio}%</strong></div>
+                <div class="company-donut-canvas-wrap">
+                    <canvas id="${canvasId}"></canvas>
                 </div>
             `;
+            companyDonutsContainer.appendChild(box);
 
-            // Event Listeners for this card
-            const checkbox = card.querySelector('.todo-checkbox');
-            checkbox.addEventListener('change', () => handleToggleTodo(todo.id));
+            const ctx = document.getElementById(canvasId).getContext("2d");
+            if (companyDonutInstances[comp]) companyDonutInstances[comp].destroy();
 
-            const btnEdit = card.querySelector('.btn-edit');
-            btnEdit.addEventListener('click', () => openEditModal(todo));
-
-            const btnDelete = card.querySelector('.btn-delete');
-            btnDelete.addEventListener('click', () => handleDeleteTodo(todo.id));
-
-            elements.todoItemsList.appendChild(card);
-        });
-    }
-
-    function showLoading(show) {
-        if (elements.loadingSpinner) {
-            elements.loadingSpinner.style.display = show ? 'flex' : 'none';
-        }
-    }
-
-    function escapeHtml(str) {
-        if (!str) return '';
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
-
-    // ================= Event Bindings =================
-    function bindEvents() {
-        // Theme Toggle
-        elements.themeToggleBtn.addEventListener('click', toggleTheme);
-
-        // Form Submit
-        elements.todoForm.addEventListener('submit', handleAddTodo);
-
-        // Status Tabs
-        elements.statusTabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                elements.statusTabs.forEach(t => {
-                    t.classList.remove('active');
-                    t.setAttribute('aria-selected', 'false');
-                });
-                tab.classList.add('active');
-                tab.setAttribute('aria-selected', 'true');
-                state.currentStatus = tab.dataset.status;
-                loadTodos();
+            companyDonutInstances[comp] = new Chart(ctx, {
+                type: "doughnut",
+                data: {
+                    labels: ["긍정", "부정"],
+                    datasets: [{
+                        data: [data.positive, data.negative],
+                        backgroundColor: ["#10b981", "#f43f5e"],
+                        borderColor: ["#0d1424", "#0d1424"],
+                        borderWidth: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: "bottom",
+                            labels: { color: "#cbd5e1", font: { size: 11, family: "Pretendard" }, boxWidth: 10 }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (c) => ` ${c.label}: ${c.raw}건 (${data.total > 0 ? ((c.raw / data.total)*100).toFixed(1) : 0}%)`
+                            }
+                        }
+                    },
+                    cutout: "60%"
+                }
             });
         });
+    }
 
-        // Search Input (with debounce)
-        let searchTimeout;
-        elements.inputSearch.addEventListener('input', (e) => {
-            const val = e.target.value;
-            state.searchQuery = val;
-            elements.btnClearSearch.style.display = val ? 'block' : 'none';
-
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                loadTodos();
-            }, 250);
-        });
-
-        elements.btnClearSearch.addEventListener('click', () => {
-            elements.inputSearch.value = '';
-            state.searchQuery = '';
-            elements.btnClearSearch.style.display = 'none';
-            loadTodos();
-            elements.inputSearch.focus();
-        });
-
-        // Category Filter
-        elements.filterCategory.addEventListener('change', (e) => {
-            state.currentCategory = e.target.value;
-            loadTodos();
-        });
-
-        // Sort Selector
-        elements.filterSort.addEventListener('change', (e) => {
-            state.currentSort = e.target.value;
-            loadTodos();
-        });
-
-        // Clear Completed Button
-        elements.btnClearCompleted.addEventListener('click', handleClearCompleted);
-
-        // Modal Events
-        elements.btnCloseModal.addEventListener('click', closeEditModal);
-        elements.btnCancelEdit.addEventListener('click', closeEditModal);
-        elements.editForm.addEventListener('submit', handleSaveEdit);
-
-        // Close modal on escape or background click
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && elements.editModal.classList.contains('active')) {
-                closeEditModal();
-            }
-        });
-        elements.editModal.addEventListener('click', (e) => {
-            if (e.target === elements.editModal) {
-                closeEditModal();
-            }
+    // 통계 요약 테이블 렌더링
+    function renderSummaryTable(tableData) {
+        summaryTableBody.innerHTML = "";
+        tableData.forEach(row => {
+            const tr = document.createElement("tr");
+            const ratioColor = row.ratio >= 60 ? "#34d399" : (row.ratio >= 40 ? "#fbbf24" : "#fb7185");
+            tr.innerHTML = `
+                <td><strong>${row.company}</strong></td>
+                <td class="text-center"><span class="sentiment-badge sentiment-pos">+${row.positive}</span></td>
+                <td class="text-center"><span class="sentiment-badge sentiment-neg">-${row.negative}</span></td>
+                <td class="text-center"><strong>${row.total}</strong>건</td>
+                <td class="text-right" style="color:${ratioColor}; font-weight:700;">${row.ratio}%</td>
+            `;
+            summaryTableBody.appendChild(tr);
         });
     }
+
+    // 기사 목록 렌더링
+    function renderArticlesTable(articles) {
+        articlesTableBody.innerHTML = "";
+        if (!articles.length) {
+            articlesTableBody.innerHTML = '<tr><td colspan="4" class="text-center py-3 text-muted">표시할 기사 데이터가 없습니다.</td></tr>';
+            return;
+        }
+
+        articles.forEach(art => {
+            const tr = document.createElement("tr");
+            let badgeClass = "sentiment-neu";
+            if (art.sentiment === "긍정") badgeClass = "sentiment-pos";
+            else if (art.sentiment === "부정") badgeClass = "sentiment-neg";
+
+            tr.innerHTML = `
+                <td>${art.company}</td>
+                <td class="text-center"><span class="sentiment-badge ${badgeClass}">${art.sentiment}</span></td>
+                <td>${art.title}</td>
+                <td class="text-center">
+                    <a href="${art.url}" target="_blank" rel="noopener noreferrer" class="article-link" title="네이버 카페 바로가기">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    </a>
+                </td>
+            `;
+            articlesTableBody.appendChild(tr);
+        });
+    }
+
+    // 기사 검색 필터링
+    articleFilterInput.addEventListener("input", (e) => {
+        const query = e.target.value.toLowerCase();
+        const filtered = cachedArticles.filter(a => 
+            a.title.toLowerCase().includes(query) || 
+            a.company.toLowerCase().includes(query) ||
+            a.sentiment.toLowerCase().includes(query)
+        );
+        renderArticlesTable(filtered);
+    });
+
+    // --------------------------------------------------------
+    // 9. Toast Helper
+    // --------------------------------------------------------
+    function showToast(message, type = "info") {
+        const container = document.getElementById("toastContainer");
+        const toast = document.createElement("div");
+        toast.className = `toast ${type}`;
+        
+        let icon = "fa-info-circle";
+        if (type === "success") icon = "fa-check-circle";
+        else if (type === "error") icon = "fa-exclamation-triangle";
+        else if (type === "warn") icon = "fa-triangle-exclamation";
+
+        toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.style.opacity = "0";
+            toast.style.transform = "translateX(100%)";
+            toast.style.transition = "all 0.4s ease";
+            setTimeout(() => toast.remove(), 400);
+        }, 3500);
+    }
+
+    // --------------------------------------------------------
+    // 10. 초기화 실행
+    // --------------------------------------------------------
+    initEventSource();
+    loadDashboardData();
 });

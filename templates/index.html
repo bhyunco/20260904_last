@@ -3,280 +3,340 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="파이썬 Flask로 구축된 현대적이고 스마트한 고성능 할 일 관리(To-Do) 웹 애플리케이션입니다.">
-    <meta name="theme-color" content="#0f172a">
-    <title>TaskFlow - 스마트 할 일 관리 웹앱</title>
-    
+    <title>VIBE RPA - 교육기업 시장 반응 분석 대시보드</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="theme-dark">
-    <!-- Ambient Background Glows -->
-    <div class="ambient-glow glow-1" aria-hidden="true"></div>
-    <div class="ambient-glow glow-2" aria-hidden="true"></div>
-    <div class="ambient-glow glow-3" aria-hidden="true"></div>
-
-    <div class="app-wrapper">
+<body>
+    <div class="app-container">
+        
         <!-- Header -->
         <header class="app-header">
-            <div class="header-brand">
-                <div class="brand-icon">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                    </svg>
-                </div>
-                <div>
-                    <h1 class="brand-title">TaskFlow</h1>
-                    <p class="brand-subtitle">스마트 파이썬 Flask 할 일 관리 시스템</p>
-                </div>
+            <div class="header-left">
+                <div class="brand-badge"><i class="fa-solid fa-bolt-lightning"></i> VIBE RPA INTELLIGENCE</div>
+                <h1>교육기업 시장 반응 실시간 분석 대시보드</h1>
+                <p class="subtitle">네이버 카페 크롤링 · OpenAI LLM 감성 분석 · 교차 집계 통계 · 비즈니스 자동 메일링</p>
             </div>
-            <div class="header-actions">
-                <div class="current-date-badge" id="current-date-display">
-                    <!-- Javascript will render formatted Korean date -->
-                    2026. 09. 03
+            <div class="header-right">
+                <div class="status-pill" id="systemStatusPill">
+                    <span class="status-dot"></span>
+                    <span id="systemStatusText">시스템 준비 완료</span>
                 </div>
-                <button id="btn-theme-toggle" class="icon-button" aria-label="테마 변경" title="라이트/다크 테마 토글">
-                    <span class="theme-icon">🌙</span>
+                <button class="btn btn-secondary" id="btnRefreshData" title="데이터 새로고침">
+                    <i class="fa-solid fa-arrows-rotate"></i> 새로고침
                 </button>
             </div>
         </header>
 
-        <!-- Dashboard Analytics Overview -->
-        <section class="dashboard-section" aria-label="할 일 통계 현황">
-            <div class="stat-card" id="card-total-tasks">
-                <div class="stat-icon icon-total">📋</div>
-                <div class="stat-content">
-                    <span class="stat-label">전체 할 일</span>
-                    <span class="stat-value" id="stat-total-count">{{ initial_stats.total }}</span>
-                </div>
-            </div>
-            <div class="stat-card" id="card-pending-tasks">
-                <div class="stat-icon icon-pending">⏳</div>
-                <div class="stat-content">
-                    <span class="stat-label">진행 중</span>
-                    <span class="stat-value text-amber" id="stat-pending-count">{{ initial_stats.pending }}</span>
-                </div>
-            </div>
-            <div class="stat-card" id="card-completed-tasks">
-                <div class="stat-icon icon-completed">✨</div>
-                <div class="stat-content">
-                    <span class="stat-label">완료됨</span>
-                    <span class="stat-value text-emerald" id="stat-completed-count">{{ initial_stats.completed }}</span>
-                </div>
-            </div>
-            <div class="stat-card" id="card-rate-tasks">
-                <div class="stat-icon icon-rate">🎯</div>
-                <div class="stat-content">
-                    <span class="stat-label">달성률</span>
-                    <span class="stat-value text-indigo" id="stat-rate-count">{{ initial_stats.completion_rate }}%</span>
-                </div>
-                <div class="progress-bar-container">
-                    <div class="progress-bar-fill" id="stat-progress-bar" style="width: {{ initial_stats.completion_rate }}%;"></div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Quick Add Task Form -->
-        <section class="create-section" aria-label="할 일 등록">
-            <form id="todo-form" class="create-card">
-                <div class="create-header">
-                    <h2 class="create-title">새로운 할 일 등록</h2>
-                    <span class="create-hint">Enter를 누르면 바로 추가됩니다</span>
-                </div>
-                <div class="form-row main-input-row">
-                    <div class="input-with-icon">
-                        <span class="input-icon">✏️</span>
-                        <input 
-                            type="text" 
-                            id="input-task-title" 
-                            name="title" 
-                            placeholder="어떤 할 일을 계획하고 계신가요?" 
-                            required 
-                            autocomplete="off"
-                            maxlength="100"
-                        >
-                    </div>
-                    <button type="submit" id="btn-submit-task" class="btn-primary">
-                        <span class="btn-icon">+</span>
-                        <span class="btn-text">추가하기</span>
-                    </button>
-                </div>
+        <!-- Main Layout: Grid -->
+        <div class="dashboard-grid">
+            
+            <!-- Left Column: Controls & Real-time Progress -->
+            <aside class="control-panel-column">
                 
-                <!-- Expanded details (category, priority, due date, description) -->
-                <div class="form-details-grid">
-                    <div class="field-group">
-                        <label for="select-category" class="field-label">카테고리</label>
-                        <select id="select-category" name="category" class="custom-select">
-                            <option value="업무">🏢 업무</option>
-                            <option value="개인">👤 개인</option>
-                            <option value="공부">📚 공부</option>
-                            <option value="쇼핑">🛒 쇼핑</option>
-                            <option value="아이디어">💡 아이디어</option>
-                            <option value="기타">📌 기타</option>
-                        </select>
+                <!-- Card 1: Configuration & Controls -->
+                <div class="card control-card">
+                    <div class="card-header">
+                        <h2><i class="fa-solid fa-sliders"></i> RPA 자동화 제어 센터</h2>
+                        <span class="badge badge-info">설정 & 실행</span>
                     </div>
+                    <div class="card-body">
+                        
+                        <!-- Target Companies -->
+                        <div class="form-group">
+                            <label><i class="fa-solid fa-building"></i> 분석 대상 교육기업</label>
+                            <div class="tags-input-container" id="companyTagsContainer">
+                                <span class="tag">멀티캠퍼스 <i class="fa-solid fa-xmark remove-tag"></i></span>
+                                <span class="tag">패스트캠퍼스 <i class="fa-solid fa-xmark remove-tag"></i></span>
+                                <span class="tag">바이브코딩스쿨 <i class="fa-solid fa-xmark remove-tag"></i></span>
+                            </div>
+                            <div class="input-with-button">
+                                <input type="text" id="newCompanyInput" placeholder="추가할 기업명 입력 후 추가">
+                                <button type="button" class="btn btn-small btn-secondary" id="btnAddCompany">추가</button>
+                            </div>
+                        </div>
 
-                    <div class="field-group">
-                        <label for="select-priority" class="field-label">우선순위</label>
-                        <select id="select-priority" name="priority" class="custom-select">
-                            <option value="높음">🔴 높음</option>
-                            <option value="보통" selected>🟡 보통</option>
-                            <option value="낮음">🟢 낮음</option>
-                        </select>
-                    </div>
+                        <!-- Email Settings -->
+                        <div class="form-row">
+                            <div class="form-group flex-1">
+                                <label><i class="fa-solid fa-paper-plane"></i> 발신자 이메일</label>
+                                <input type="email" id="senderEmail" value="bhyunco.test@gmail.com">
+                            </div>
+                            <div class="form-group flex-1">
+                                <label><i class="fa-solid fa-inbox"></i> 수신자 이메일</label>
+                                <input type="email" id="receiverEmail" value="bhyunco.test@gmail.com">
+                            </div>
+                        </div>
 
-                    <div class="field-group">
-                        <label for="input-due-date" class="field-label">마감 기한</label>
-                        <input type="date" id="input-due-date" name="due_date" class="custom-input-date">
-                    </div>
+                        <!-- App Password with Remember Checkbox -->
+                        <div class="form-group">
+                            <div class="label-with-toggle">
+                                <label><i class="fa-solid fa-key"></i> Gmail 16자리 앱 비밀번호</label>
+                                <button type="button" class="btn-link" id="togglePasswordVisibility">
+                                    <i class="fa-solid fa-eye" id="eyeIcon"></i> 보기
+                                </button>
+                            </div>
+                            <input type="password" id="appPasswordInput" value="deki uepk wcmc xrul" placeholder="Gmail 앱 비밀번호 입력">
+                            
+                            <!-- Checkbox: Remember Password -->
+                            <div class="checkbox-wrapper">
+                                <label class="custom-checkbox">
+                                    <input type="checkbox" id="rememberPasswordCheck" checked>
+                                    <span class="checkmark"></span>
+                                    <span class="checkbox-label"><strong>앱 비밀번호 기억하기</strong> (브라우저에 안전하게 저장)</span>
+                                </label>
+                            </div>
+                        </div>
 
-                    <div class="field-group full-width">
-                        <label for="input-task-desc" class="field-label">상세 메모 (선택)</label>
-                        <input type="text" id="input-task-desc" name="description" placeholder="세부 내용이나 메모를 입력하세요" class="custom-input-text">
+                        <!-- Chrome Headless Toggle -->
+                        <div class="form-group">
+                            <label class="custom-checkbox">
+                                <input type="checkbox" id="headlessCheck" checked>
+                                <span class="checkmark"></span>
+                                <span class="checkbox-label">백그라운드 크롤링 모드 (Headless 브라우저)</span>
+                            </label>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="action-buttons-group">
+                            <button class="btn btn-primary btn-lg" id="btnStartRpa">
+                                <i class="fa-solid fa-play"></i> RPA 전체 자동화 실행
+                            </button>
+                            <button class="btn btn-outline" id="btnSendEmailOnly">
+                                <i class="fa-solid fa-envelope"></i> 결과 이메일만 재발송
+                            </button>
+                        </div>
+
                     </div>
                 </div>
-            </form>
-        </section>
 
-        <!-- Controls: Filters, Search, Sort & Bulk Actions -->
-        <nav class="controls-nav" aria-label="필터 및 정렬 컨트롤">
-            <!-- Status Tabs -->
-            <div class="tabs-group" role="tablist" aria-label="상태 필터">
-                <button type="button" class="tab-button active" id="filter-all" data-status="all" role="tab" aria-selected="true">
-                    전체 <span class="tab-badge" id="badge-all-count">0</span>
-                </button>
-                <button type="button" class="tab-button" id="filter-active" data-status="active" role="tab" aria-selected="false">
-                    진행 중 <span class="tab-badge" id="badge-active-count">0</span>
-                </button>
-                <button type="button" class="tab-button" id="filter-completed" data-status="completed" role="tab" aria-selected="false">
-                    완료됨 <span class="tab-badge" id="badge-completed-count">0</span>
-                </button>
-            </div>
+                <!-- Card 2: Real-time Progress & Console -->
+                <div class="card progress-card" id="progressSection">
+                    <div class="card-header">
+                        <h2><i class="fa-solid fa-microchip"></i> 실시간 진행률 (<span id="progressPercentDisplay">0%</span>)</h2>
+                        <span class="pulse-indicator" id="progressPulse"></span>
+                    </div>
+                    <div class="card-body">
+                        
+                        <!-- Progress Bar with Percentage -->
+                        <div class="progress-container">
+                            <div class="progress-bar-track">
+                                <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;">
+                                    <div class="progress-light-effect"></div>
+                                </div>
+                            </div>
+                            <div class="progress-percentage-banner">
+                                <span class="pct-number" id="bigPercentText">0</span><span class="pct-symbol">%</span>
+                                <span class="pct-message" id="currentStepMessage">대기 중... 실행 버튼을 누르면 시작됩니다.</span>
+                            </div>
+                        </div>
 
-            <!-- Search, Category Filter, and Sort -->
-            <div class="controls-toolbar">
-                <div class="search-box">
-                    <span class="search-icon">🔍</span>
-                    <input type="text" id="input-search" placeholder="할 일 검색..." aria-label="할 일 검색">
-                    <button type="button" id="btn-clear-search" class="clear-search-btn" title="검색어 지우기" style="display:none;">✕</button>
+                        <!-- Process Step Tracker -->
+                        <div class="step-tracker">
+                            <div class="step-item active" id="step1">
+                                <div class="step-circle"><i class="fa-solid fa-spider"></i></div>
+                                <div class="step-name">네이버 크롤링</div>
+                            </div>
+                            <div class="step-line" id="line1"></div>
+                            <div class="step-item" id="step2">
+                                <div class="step-circle"><i class="fa-solid fa-brain"></i></div>
+                                <div class="step-name">LLM 감성 분석</div>
+                            </div>
+                            <div class="step-line" id="line2"></div>
+                            <div class="step-item" id="step3">
+                                <div class="step-circle"><i class="fa-solid fa-table-cells"></i></div>
+                                <div class="step-name">교차 집계</div>
+                            </div>
+                            <div class="step-line" id="line3"></div>
+                            <div class="step-item" id="step4">
+                                <div class="step-circle"><i class="fa-solid fa-envelope-circle-check"></i></div>
+                                <div class="step-name">비즈니스 메일</div>
+                            </div>
+                        </div>
+
+                        <!-- Terminal Style Live Logs -->
+                        <div class="terminal-wrapper">
+                            <div class="terminal-header">
+                                <span><i class="fa-solid fa-terminal"></i> 실시간 실행 로그</span>
+                                <button type="button" class="terminal-clear" id="btnClearLogs">지우기</button>
+                            </div>
+                            <div class="terminal-body" id="terminalLogs">
+                                <div class="log-line info">[00:00:00] 시스템이 준비되었습니다. "RPA 전체 자동화 실행" 버튼을 클릭하세요.</div>
+                            </div>
+                        </div>
+
+                    </div>
                 </div>
 
-                <div class="filter-dropdowns">
-                    <select id="filter-category" class="filter-select" aria-label="카테고리 필터">
-                        <option value="all">모든 카테고리</option>
-                        <option value="업무">🏢 업무</option>
-                        <option value="개인">👤 개인</option>
-                        <option value="공부">📚 공부</option>
-                        <option value="쇼핑">🛒 쇼핑</option>
-                        <option value="아이디어">💡 아이디어</option>
-                        <option value="기타">📌 기타</option>
-                    </select>
+            </aside>
 
-                    <select id="filter-sort" class="filter-select" aria-label="정렬 기준">
-                        <option value="newest">최신 등록순</option>
-                        <option value="oldest">오래된순</option>
-                        <option value="due_date">마감 기한순</option>
-                        <option value="priority">우선순위순</option>
-                    </select>
-
-                    <button type="button" id="btn-clear-completed" class="btn-outline-danger" title="완료된 할 일 일괄 정리">
-                        🗑️ 완료 삭제
-                    </button>
-                </div>
-            </div>
-        </nav>
-
-        <!-- Todo List Container -->
-        <main class="todo-list-container" aria-label="할 일 목록">
-            <div id="todo-items-list" class="todo-items-list" role="list">
-                <!-- Todo item cards will be dynamically rendered via Javascript -->
-            </div>
-
-            <!-- Empty State -->
-            <div id="empty-state" class="empty-state" style="display: none;">
-                <div class="empty-state-icon">🎉</div>
-                <h3 class="empty-state-title">할 일이 없습니다!</h3>
-                <p class="empty-state-desc">새로운 계획을 등록하거나 다른 필터를 선택해 보세요.</p>
-            </div>
-
-            <!-- Loading Spinner -->
-            <div id="loading-spinner" class="loading-spinner" style="display: none;">
-                <div class="spinner-ring"></div>
-                <span>목록을 불러오는 중...</span>
-            </div>
-        </main>
-
-        <!-- Footer -->
-        <footer class="app-footer">
-            <p>TaskFlow Python Flask Application &bull; SQLite Persistence &bull; Crafted with Modern Vibe</p>
-        </footer>
-    </div>
-
-    <!-- Edit Task Modal -->
-    <div id="edit-modal" class="modal-overlay" aria-hidden="true" role="dialog" aria-labelledby="modal-title">
-        <div class="modal-card">
-            <div class="modal-header">
-                <h2 id="modal-title" class="modal-title">할 일 수정하기</h2>
-                <button type="button" id="btn-close-modal" class="btn-modal-close" aria-label="닫기">✕</button>
-            </div>
-            <form id="edit-form" class="modal-body">
-                <input type="hidden" id="edit-task-id">
+            <!-- Right Column: Analytics & Responsive Charts Dashboard -->
+            <main class="analytics-column">
                 
-                <div class="form-group">
-                    <label for="edit-title" class="field-label">할 일 제목</label>
-                    <input type="text" id="edit-title" required class="modal-input" maxlength="100">
+                <!-- KPI Stat Cards -->
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-icon icon-blue"><i class="fa-solid fa-newspaper"></i></div>
+                        <div class="kpi-info">
+                            <div class="kpi-label">총 분석 게시글</div>
+                            <div class="kpi-value" id="kpiTotalArticles">-</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon icon-emerald"><i class="fa-solid fa-thumbs-up"></i></div>
+                        <div class="kpi-info">
+                            <div class="kpi-label">긍정 반응 건수</div>
+                            <div class="kpi-value positive-val" id="kpiPositive">-</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon icon-rose"><i class="fa-solid fa-thumbs-down"></i></div>
+                        <div class="kpi-info">
+                            <div class="kpi-label">부정 반응 건수</div>
+                            <div class="kpi-value negative-val" id="kpiNegative">-</div>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-icon icon-purple"><i class="fa-solid fa-chart-pie"></i></div>
+                        <div class="kpi-info">
+                            <div class="kpi-label">평균 긍정 비율</div>
+                            <div class="kpi-value" id="kpiPosRatio">-%</div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="modal-grid-2">
-                    <div class="form-group">
-                        <label for="edit-category" class="field-label">카테고리</label>
-                        <select id="edit-category" class="modal-select">
-                            <option value="업무">🏢 업무</option>
-                            <option value="개인">👤 개인</option>
-                            <option value="공부">📚 공부</option>
-                            <option value="쇼핑">🛒 쇼핑</option>
-                            <option value="아이디어">💡 아이디어</option>
-                            <option value="기타">📌 기타</option>
-                        </select>
+                <!-- Charts Section: Responsive Pie/Donut & Bar Charts -->
+                <div class="charts-main-grid">
+                    
+                    <!-- Overall Sentiment Donut Chart -->
+                    <div class="card chart-card">
+                        <div class="card-header">
+                            <h2><i class="fa-solid fa-chart-pie"></i> 전체 시장 반응 비율</h2>
+                            <span class="badge badge-success">Overall Donut</span>
+                        </div>
+                        <div class="card-body chart-body">
+                            <div class="canvas-container">
+                                <canvas id="overallDonutChart"></canvas>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="edit-priority" class="field-label">우선순위</label>
-                        <select id="edit-priority" class="modal-select">
-                            <option value="높음">🔴 높음</option>
-                            <option value="보통">🟡 보통</option>
-                            <option value="낮음">🟢 낮음</option>
-                        </select>
+                    <!-- Company Comparison Bar Chart -->
+                    <div class="card chart-card">
+                        <div class="card-header">
+                            <h2><i class="fa-solid fa-chart-column"></i> 기업별 긍·부정 비교</h2>
+                            <span class="badge badge-primary">Comparative Bar</span>
+                        </div>
+                        <div class="card-body chart-body">
+                            <div class="canvas-container">
+                                <canvas id="companyBarChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Company-Specific Responsive Pie/Donut Charts Grid -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2><i class="fa-solid fa-chart-pie"></i> 기업별 세부 긍/부정 원형 그래프</h2>
+                        <span class="badge badge-info">반응형 대시보드</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="company-donuts-grid" id="companyDonutsContainer">
+                            <!-- Dynamically injected company pie/donut charts -->
+                            <div class="loading-placeholder">데이터를 불러오는 중입니다...</div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="edit-due-date" class="field-label">마감 기한</label>
-                    <input type="date" id="edit-due-date" class="modal-input">
+                <!-- Data Tables & Excel Export -->
+                <div class="card">
+                    <div class="card-header header-with-actions">
+                        <div>
+                            <h2><i class="fa-solid fa-table-cells-large"></i> 데이터 요약 및 원본 다운로드</h2>
+                            <p class="section-desc">crosstab 교차 집계 통계표 (DE.xlsx) 및 추출 기사 목록</p>
+                        </div>
+                        <div class="export-buttons">
+                            <a href="/api/download/DE.xlsx" class="btn btn-small btn-excel" download>
+                                <i class="fa-solid fa-file-excel"></i> DE.xlsx 다운로드
+                            </a>
+                            <a href="/api/download/naver_cafe_article_yn.xlsx" class="btn btn-small btn-secondary" download>
+                                <i class="fa-solid fa-file-excel"></i> 감성분석본(yn)
+                            </a>
+                            <a href="/api/download/naver_cafe_article.xlsx" class="btn btn-small btn-secondary" download>
+                                <i class="fa-solid fa-file-excel"></i> 원본게시글
+                            </a>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        
+                        <!-- Crosstab Table -->
+                        <div class="table-responsive">
+                            <table class="data-table" id="summaryTable">
+                                <thead>
+                                    <tr>
+                                        <th>기업명</th>
+                                        <th class="text-center">긍정(+) 건수</th>
+                                        <th class="text-center">부정(-) 건수</th>
+                                        <th class="text-center">전체 유효 건수</th>
+                                        <th class="text-right">긍정 비율 (%)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="summaryTableBody">
+                                    <tr>
+                                        <td colspan="5" class="text-center py-4 text-muted">데이터를 로드하는 중입니다...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Articles Preview Section -->
+                        <div class="articles-preview-wrapper mt-4">
+                            <div class="articles-header">
+                                <h3><i class="fa-solid fa-list-check"></i> 수집된 네이버 카페 게시글 미리보기 (최신순)</h3>
+                                <input type="text" id="articleFilterInput" class="input-search" placeholder="기사 제목 또는 기업 검색...">
+                            </div>
+                            <div class="table-responsive max-h-350">
+                                <table class="data-table data-table-sm" id="articlesTable">
+                                    <thead>
+                                        <tr>
+                                            <th width="120">기업명</th>
+                                            <th width="90" class="text-center">감성분석</th>
+                                            <th>게시글 제목</th>
+                                            <th width="80" class="text-center">링크</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="articlesTableBody">
+                                        <tr>
+                                            <td colspan="4" class="text-center py-3 text-muted">게시글 목록 로드 대기 중...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="edit-description" class="field-label">상세 메모</label>
-                    <textarea id="edit-description" rows="3" class="modal-textarea" placeholder="메모를 입력하세요..."></textarea>
-                </div>
+            </main>
 
-                <div class="modal-footer">
-                    <button type="button" id="btn-cancel-edit" class="btn-secondary">취소</button>
-                    <button type="submit" id="btn-save-edit" class="btn-primary">저장 완료</button>
-                </div>
-            </form>
         </div>
+
     </div>
 
-    <!-- Toast Notification Hub -->
-    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+    <!-- Notification Toast Modal -->
+    <div class="toast-container" id="toastContainer"></div>
 
-    <!-- Application Script -->
-    <script src="/static/js/app.js"></script>
+    <!-- App Script -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>
